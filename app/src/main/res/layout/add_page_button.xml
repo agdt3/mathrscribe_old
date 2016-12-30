@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageButton xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/add_page_button"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_alignParentBottom="true"
+    android:layout_alignParentRight="true"
+    android:layout_margin="16dp"
+    android:tint="@color/colorAccent"
+    app:srcCompat="@android:drawable/ic_input_add"
+    android:elevation="8dp"
+    android:cropToPadding="false"
+    android:adjustViewBounds="false">
+</ImageButton>

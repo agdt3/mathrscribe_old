@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ToggleButton xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/drawable_button"
+    android:layout_alignParentTop="true"
+    android:layout_alignParentLeft="true"
+    android:layout_marginTop="200px"
+    android:layout_width="200px"
+    android:layout_height="200px">
+</ToggleButton>
