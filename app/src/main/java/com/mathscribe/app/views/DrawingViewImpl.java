@@ -70,6 +70,7 @@ public class DrawingViewImpl extends RelativeLayout implements DrawingView {
         mMotionEventSource = ObservableFactory.createMotionEventObservable(this);
         setUpDrawableToggle();
         setUpNewPageButton();
+        toggleDrawable();
     }
 
     private void setUpDrawableToggle() {
