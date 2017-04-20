@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true">
+
+    <include layout="@layout/main_toolbar" />
+    <include layout="@layout/drawable_button" />
+    <include layout="@layout/add_page_button" />
+    <com.mathscribe.app.views.DrawingViewImpl
+        android:id="@+id/drawing_view_impl"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</RelativeLayout>

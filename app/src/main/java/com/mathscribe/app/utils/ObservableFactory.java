@@ -3,29 +3,27 @@ package com.mathscribe.app.utils;
 import android.view.MotionEvent;
 import android.view.View;
 
-import rx.Observable;
-import rx.Subscriber;
+import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 
-/**
- * Created by pavela on 2016-12-26.
- */
 
 public class ObservableFactory {
-    public static Observable<View> createOnClickObservable(View view) {
-        return Observable.create(new Observable.OnSubscribe<View>() {
+    public static Observable<View> createOnClickObservable(final View view) {
+        return Observable.create(new ObservableOnSubscribe<View>() {
             @Override
-            public void call(final Subscriber<? super View> subscriber) {
+            public void subscribe(final ObservableEmitter<View> emitter) throws Exception {
                 view.setOnClickListener(new View.OnClickListener() {
                     @Override
-                    public void onClick(View v) {
+                    public void onClick(View view) {
                         try {
-                            if (subscriber.isUnsubscribed()) {
+                            if (emitter.isDisposed()) {
                                 view.setOnClickListener(null);
                             } else {
-                                subscriber.onNext(v);
+                                emitter.onNext(view);
                             }
                         } catch (Exception e) {
-                            subscriber.onError(e);
+                            emitter.onError(e);
                         }
                     }
                 });
@@ -33,24 +31,23 @@ public class ObservableFactory {
         });
     }
 
-    public static Observable<MotionEvent> createMotionEventObservable(View view) {
-        return Observable.create(new Observable.OnSubscribe<MotionEvent>() {
+    public static Observable<MotionEvent> createMotionEventObservable(final View view) {
+        return Observable.create(new ObservableOnSubscribe<MotionEvent>() {
             @Override
-            public void call(Subscriber<? super MotionEvent> observer) {
+            public void subscribe(final ObservableEmitter<MotionEvent> emitter) throws Exception {
                 view.setOnTouchListener(new View.OnTouchListener() {
                     @Override
                     public boolean onTouch(View v, MotionEvent event) {
                         try {
-                            if (observer.isUnsubscribed()) {
-                                view.setOnTouchListener(null);
+                            if (emitter.isDisposed()) {
+                                view.setOnClickListener(null);
                                 return false;
                             } else {
-                                observer.onNext(event);
+                                emitter.onNext(event);
                                 return true;
                             }
-                        }
-                        catch (Exception e) {
-                            observer.onError(e);
+                        } catch (Exception e) {
+                            emitter.onError(e);
                             return false;
                         }
                     }

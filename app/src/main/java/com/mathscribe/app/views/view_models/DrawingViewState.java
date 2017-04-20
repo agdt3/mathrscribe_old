@@ -10,7 +10,7 @@ import android.graphics.Paint;
 public class DrawingViewState {
     private Paint mDrawPaint;
     private int mPaintColor = Color.BLACK;
-    private int mStrokeWidth = 5;
+    private int mSTROKE_WIDTH= 5;
     private boolean mAntiAlias = true;
     private boolean mViewIsDrawable = false;
 
@@ -26,7 +26,7 @@ public class DrawingViewState {
         mDrawPaint = new Paint();
         mDrawPaint.setColor(mPaintColor);
         mDrawPaint.setAntiAlias(mAntiAlias);
-        mDrawPaint.setStrokeWidth(mStrokeWidth);
+        mDrawPaint.setStrokeWidth(mSTROKE_WIDTH);
         mDrawPaint.setStyle(Paint.Style.STROKE);
         mDrawPaint.setStrokeJoin(Paint.Join.ROUND);
         mDrawPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -36,7 +36,7 @@ public class DrawingViewState {
 
     public void setIsDrawable(boolean isDrawable) { mViewIsDrawable = isDrawable; }
     public boolean isDrawable() { return mViewIsDrawable; }
-    public void setStrokeWidth(int strokeWidth) { mStrokeWidth = strokeWidth; }
+    public void setStrokeWidth(int strokeWidth) { mSTROKE_WIDTH = strokeWidth; }
     public void setPaintColor(int color) { mPaintColor = color; }
     public void setAntiAlias(boolean antiAlias) { mAntiAlias = antiAlias; }
 }

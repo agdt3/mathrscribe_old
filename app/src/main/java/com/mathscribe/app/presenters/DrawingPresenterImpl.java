@@ -1,52 +1,72 @@
 package com.mathscribe.app.presenters;
 
+import android.app.Activity;
+import android.graphics.PointF;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.ToggleButton;
 
+import com.mathscribe.app.ScribeApplication;
+import com.mathscribe.app.db.models.EPage;
+import com.mathscribe.app.db.models.EPath;
 import com.mathscribe.app.models.Paths;
-import com.mathscribe.app.views.DrawingViewImpl;
+import com.mathscribe.app.presenters.interfaces.DrawingPresenter;
+import com.mathscribe.app.views.interfaces.DrawingController;
 
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
+import java.util.List;
 
-/**
- * Created by pavela on 2016-12-11.
- */
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 
-public class DrawingPresenterImpl implements DrawingPresenter<DrawingViewImpl> {
-    private DrawingViewImpl mView;
-    private Subscriber<MotionEvent> mMotionEventSink;
-    private Subscriber<View> mToggleDrawableSink;
-    private Subscriber<View> mNewPageSink;
+import io.reactivex.observers.ResourceObserver;
+import io.requery.Persistable;
+import io.requery.query.Result;
+import io.requery.reactivex.ReactiveEntityStore;
+import io.requery.reactivex.ReactiveResult;
+
+public class DrawingPresenterImpl implements DrawingPresenter<DrawingController> {
+    private DrawingController mView;
+    private ResourceObserver<MotionEvent> mMotionEventSink;
+    private ResourceObserver<View> mToggleDrawableSink;
+    private ResourceObserver<View> mNewPageSink;
 
     // Should be in a separate model
     private Paths mPaths;
+
+    // TODO: Test
+    private EPage mPage;
+    private ReactiveEntityStore<Persistable> data;
 
     public DrawingPresenterImpl() {
         loadPaths();
     }
 
     @Override
-    public void attachView(DrawingViewImpl drawingViewImpl) {
-        mView = drawingViewImpl;
-        mView.setModel(mPaths);
+    public void attachView(DrawingController drawingView) {
+        mView = drawingView;
+        mView.setPaths(mPaths);
         subscribeToView();
     }
 
     private void subscribeToView() {
-        mMotionEventSink = createSubscriber();
-        mView.getMotionEventSource()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(mMotionEventSink);
+        if (mView != null) {
+            mMotionEventSink = createMotionEventObserver();
+            mView.getMotionEventSource()
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(mMotionEventSink);
 
-        mToggleDrawableSink = createDrawableClickSubscriber();
-        mView.getDrawableClickSource()
-                .subscribe(mToggleDrawableSink);
+            mToggleDrawableSink = createDrawableClickObserver();
+            mView.getDrawableClickSource()
+                    .subscribe(mToggleDrawableSink);
+
+            mNewPageSink = createNewPageClickObserver();
+            mView.getNewPageClickSource()
+                    .subscribe(mNewPageSink);
+        }
     }
 
     private void loadPaths() {
@@ -61,28 +81,14 @@ public class DrawingPresenterImpl implements DrawingPresenter<DrawingViewImpl> {
         }
     }
 
-    private Func1<MotionEvent, Boolean> everyOther() {
-        return new Func1<MotionEvent, Boolean>() {
-            Boolean counter = false;
-
-            @Override
-            public Boolean call(MotionEvent motionEvent) {
-                counter = !counter;
-                return counter;
-            }
-        };
-    }
-
     public void detachView() {
-        mMotionEventSink.unsubscribe();
+        mMotionEventSink.dispose();
         mMotionEventSink = null;
-        mToggleDrawableSink.unsubscribe();
+        mToggleDrawableSink.dispose();
         mToggleDrawableSink = null;
+        mNewPageSink.dispose();
+        mNewPageSink = null;
         mView = null;
-    }
-
-    public void setViewDrawState(Boolean inDrawState) {
-        mView.setIsDrawable(inDrawState);
     }
 
     private void setViewStartLoading() {
@@ -93,56 +99,143 @@ public class DrawingPresenterImpl implements DrawingPresenter<DrawingViewImpl> {
         mView.hideProgress();
     }
 
-    private Subscriber<MotionEvent> createSubscriber() {
-        return new Subscriber<MotionEvent>() {
+    private ResourceObserver<MotionEvent> createMotionEventObserver() {
+        return new ResourceObserver<MotionEvent>() {
             @Override
             public void onNext(MotionEvent event) {
-                float posx = event.getX();
-                float posy = event.getY();
+                float posX = event.getX();
+                float posY = event.getY();
 
                 switch(event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        mPaths.mCurrent.moveTo(posx, posy);
+                        mPaths.moveTo(posX, posY);
                         break;
                     case MotionEvent.ACTION_MOVE:
-                        mPaths.mCurrent.lineTo(posx, posy);
+                        mPaths.lineTo(posX, posY);
                         break;
                     case MotionEvent.ACTION_UP:
-                        mPaths.addCurrentToPrevious();
+                        mPaths.addCurrentPathToPrevious();
+                        Log.d("SCRIBE", Integer.toString(mPaths.getCurrentPoints().size()));
+                        Log.d("SCRIBE", Integer.toString(mPaths.getPreviousPoints().size()));
+                        savePointsLocal();
                         break;
                     default:
                         //no-op
                 }
-                mView.setModel(mPaths);
-                mView.postInvalidate();
+                mView.setPaths(mPaths);
+                mView.redraw();
             }
 
             @Override
-            public void onError(Throwable t) {
-                Log.d("error!", t.toString());
-            }
+            public void onError(Throwable t) { Log.d("error!", t.toString()); }
 
             @Override
-            public void onCompleted() {
-                Log.d("onCompleted", "completed");
-            }
+            public void onComplete() {}
         };
     }
 
-    private Subscriber<View> createDrawableClickSubscriber() {
-        return new Subscriber<View>() {
+    private ResourceObserver<View> createDrawableClickObserver() {
+        return new ResourceObserver<View>() {
             @Override
-            public void onNext(View v) {
-                setViewDrawState(((ToggleButton) v).isChecked());
-            }
+            public void onNext(View view) { mView.setIsDrawable(); }
 
             @Override
-            public void onCompleted() {}
+            public void onError(Throwable e) { Log.d("SCRIBE", e.toString()); }
 
             @Override
-            public void onError(Throwable t) {
-                Log.d("SCRIBE", t.toString());
-            }
+            public void onComplete() {}
         };
     }
+
+    private ResourceObserver<View> createNewPageClickObserver() {
+        return new ResourceObserver<View>() {
+            @Override
+            public void onNext(View view) { mView.createNewPage(); }
+
+            @Override
+            public void onError(Throwable e) { Log.d("SCRIBE", e.toString()); }
+
+            @Override
+            public void onComplete() {}
+        };
+    }
+
+    // TODO: Should live on the model
+    private String convertPointListToString(List<PointF> points) {
+        StringBuilder sb = new StringBuilder();
+        String result = "";
+        try {
+            for (PointF p : points) {
+                sb.append(p.x);
+                sb.append(",");
+                sb.append(p.y);
+                sb.append(",");
+            }
+            result = sb.toString();
+        } catch (Exception e) {
+            Log.d("SCRIBE", e.toString());
+        }
+        return result;
+    }
+
+    private void savePointsLocal() {
+        // Local save should be fast enough to avoid race conditions
+        // Write to Sqlite DB
+        Log.d("SCRIBE", "savePointsLocal");
+        data = ((ScribeApplication) ((Activity)mView).getApplication()).getDataStore();
+        List<List<PointF>> allPoints = mPaths.getPreviousPoints();
+        List<PointF> points = allPoints.get(0);
+        Log.d("SCRIBE", Integer.toString(allPoints.size()));
+        Log.d("SCRIBE", "got here");
+        String result = convertPointListToString(points);
+        EPath ePath = new EPath();
+        ePath.setPoints(result);
+        EPage ePage = new EPage();
+        ePage.setIdx(1);
+        ePage.getPaths().add(ePath);
+        data.insert(ePage).toObservable().subscribe(new ResourceObserver<EPage>() {
+            @Override
+            public void onNext(EPage epg) {
+                Log.d("SCRIBE", "onNext " + epg.toString());
+            }
+            @Override
+            public void onComplete() {
+                Log.d("SCRIBE", "onComplete");
+                getData();
+            }
+            @Override
+            public void onError(Throwable t) { Log.d("SCRIBE", t.toString()); }
+        });
+        Log.d("SCRIBE", "finished");
+    }
+
+    public void getData() {
+        Log.d("SCRIBE", "getData");
+        data = ((ScribeApplication) ((Activity)mView).getApplication()).getDataStore();
+        Observable<ReactiveResult<EPage>> result1 = data.select(EPage.class).where(EPage.PAGE_ID.eq(1)).get().observableResult();
+        result1.subscribe(new Observer<ReactiveResult<EPage>>() {
+            @Override
+            public void onSubscribe(Disposable d) {}
+
+            @Override
+            public void onNext(ReactiveResult<EPage> ePage) {
+               Log.d("SCRIBE", "onNext " + ePage.first().toString());
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                Log.d("SCRIBE", "onError" + e);
+            }
+
+            @Override
+            public void onComplete() {
+                Log.d("SCRIBE", "onComplete");
+            }
+        });
+
+        Result<EPage> query = data.select(EPage.class).get();
+        Log.d("SCRIBE query", query.first().toString());
+    }
+
+    public void onDestroy() { detachView(); }
 }
